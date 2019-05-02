@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 class States
 {
@@ -32,7 +33,7 @@ public class GameManager : MonoBehaviour
 
     // 実験用
     private const float GAMESPEED = 1f;
-    
+
 
     // Prefabs //
     // ブロックのPrefabオブジェクト
@@ -61,7 +62,40 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        states.timer += Time.deltaTime*GAMESPEED;
+        Inputs();
+
+        Interval(Time.deltaTime);
+    }
+
+    // 入力処理
+    private void Inputs()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            float w = Screen.width;
+            float h = Screen.height;
+            float x = Input.mousePosition.x;
+            float y = Input.mousePosition.y;
+
+            if (x <= w * 1 / 3)
+            {
+                Move(-1);
+            }
+            else if (w * 2 / 3 <= x)
+            {
+                Move(1);
+            }
+            else
+            {
+                Rotate();
+            }
+        }
+    }
+
+    // 毎フレーム処理
+    private void Interval(float deltaTime)
+    {
+        states.timer += deltaTime * GAMESPEED;
 
         switch (states.now)
         {
@@ -118,7 +152,7 @@ public class GameManager : MonoBehaviour
         for (int x = 0; x < w; x++)
         {
             blocks[x, 0].GetComponent<BlockScript>().SetOutline(true);
-            blocks[x, h-1].GetComponent<BlockScript>().SetOutline(false);
+            blocks[x, h - 1].GetComponent<BlockScript>().SetOutline(false);
         }
     }
 
@@ -126,7 +160,7 @@ public class GameManager : MonoBehaviour
     private void CreateBlock()
     {
         // 落下してくるブロックが生成される場所
-        int[] createPos = { blocks.GetLength(0) / 2-1, blocks.GetLength(1)-2 };
+        int[] createPos = { blocks.GetLength(0) / 2 - 1, blocks.GetLength(1) - 2 };
 
         // 生成される場所が埋まっていない(ゲームオーバーではない)
         if (blocks[createPos[0], createPos[1]].GetComponent<BlockScript>().IsGrounded() == false)
@@ -143,9 +177,9 @@ public class GameManager : MonoBehaviour
 
             // 落下中のブロックを表示
             blocks[fallingBlocks[0].x, fallingBlocks[0].y].
-                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[0].letter_id,false);
+                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[0].letter_id, false);
             blocks[fallingBlocks[1].x, fallingBlocks[1].y].
-                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[1].letter_id,false);
+                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[1].letter_id, false);
 
             //落下状態に移行
             states.now = States.FALLING;
@@ -156,15 +190,25 @@ public class GameManager : MonoBehaviour
     private void FallControledBlock()
     {
         // 2つのブロックのどちらも接地条件を満たしていない
-        if (blocks[fallingBlocks[0].x,fallingBlocks[0].y-1].GetComponent<BlockScript>().IsGrounded() == false&&
+        if (blocks[fallingBlocks[0].x, fallingBlocks[0].y - 1].GetComponent<BlockScript>().IsGrounded() == false &&
             blocks[fallingBlocks[1].x, fallingBlocks[1].y - 1].GetComponent<BlockScript>().IsGrounded() == false)
         {
+            int[] letter_id = new int[2];
+
             for (int i = 0; i < 2; i++)
             {
-                // 落下
-                Fall(fallingBlocks[i].x, fallingBlocks[i].y);
+                // ブロックの種類を保存
+                letter_id[i] = blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().GetAlphabet();
+                // 現在の座標を空に
+                blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().SetEmpty();
                 // 座標を更新
                 fallingBlocks[i].y--;
+            }
+
+            for(int i = 0; i < 2; i++)
+            {
+                // ひとつ下の座標を更新
+                blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().SetAlphabet(letter_id[i], false);
             }
         }
         // 接地条件を満たした
@@ -178,17 +222,17 @@ public class GameManager : MonoBehaviour
     private void FreeFallAnimation()
     {
         //落下フラグ
-        bool fall=false;
+        bool fall = false;
 
-        for(int x = 1; x < blocks.GetLength(0) - 1; x++)
+        for (int x = 1; x < blocks.GetLength(0) - 1; x++)
         {
-            for(int y = 1; y < blocks.GetLength(1) - 1; y++)
+            for (int y = 1; y < blocks.GetLength(1) - 1; y++)
             {
                 // 空のブロックでない
                 if (blocks[x, y].GetComponent<BlockScript>().IsFill())
                 {
                     // 下にあるブロックが接地されている
-                    if(blocks[x, y - 1].GetComponent<BlockScript>().IsGrounded())
+                    if (blocks[x, y - 1].GetComponent<BlockScript>().IsGrounded())
                     {
                         // 接地する
                         blocks[x, y].GetComponent<BlockScript>().SetGrounded();
@@ -213,7 +257,7 @@ public class GameManager : MonoBehaviour
     }
 
     // ブロックを1マス下に移動
-    private void Fall(int x,int y)
+    private void Fall(int x, int y)
     {
         // ブロックの種類を保存
         int letter_id = blocks[x, y].GetComponent<BlockScript>().GetAlphabet();
@@ -221,5 +265,86 @@ public class GameManager : MonoBehaviour
         blocks[x, y].GetComponent<BlockScript>().SetEmpty();
         // ひとつ下の座標を更新
         blocks[x, y - 1].GetComponent<BlockScript>().SetAlphabet(letter_id, false);
+    }
+
+    // ブロックの操作(移動)
+    private void Move(int moveX)
+    {
+        if (moveX == 0)
+        {
+            return;
+        }
+
+        if (moveX < 0)
+        {
+            moveX = -1;
+        }
+        else
+        {
+            moveX = 1;
+        }
+
+        for (int i = 0; i < 2; i++)
+        {
+            if (blocks[fallingBlocks[i].x + moveX, fallingBlocks[i].y].GetComponent<BlockScript>().IsGrounded())
+            {
+                return;
+            }
+        }
+
+        int[] letter_id = new int[2];
+        for (int i = 0; i < 2; i++)
+        {
+            // ブロックの種類を保存
+            letter_id[i] = blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().GetAlphabet();
+            // 現在の座標を空に
+            blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().SetEmpty();
+            // 座標を更新
+            fallingBlocks[i].x += moveX;
+        }
+        for(int i = 0; i < 2; i++)
+        {
+            // 更新した座標に表示
+            blocks[fallingBlocks[i].x, fallingBlocks[i].y].GetComponent<BlockScript>().SetAlphabet(letter_id[i], false);
+        }
+    }
+
+    // ブロックの操作(回転)
+    private void Rotate()
+    {
+        int differenceX = fallingBlocks[1].x - fallingBlocks[0].x;
+        int differenceY = fallingBlocks[1].y - fallingBlocks[0].y;
+        int deltaX = 0;
+        int deltaY = 0;
+
+        if (differenceX == 0 && differenceY > 0)
+        {
+            deltaX = 1;
+        }
+        if (differenceX > 0 && differenceY == 0)
+        {
+            deltaY = -1;
+        }
+        if (differenceX == 0 && differenceY < 0)
+        {
+            deltaX = -1;
+        }
+        if (differenceX < 0 && differenceY == 0)
+        {
+            deltaY = 1;
+        }
+
+        if (blocks[fallingBlocks[0].x + deltaX, fallingBlocks[0].y + deltaY].GetComponent<BlockScript>().IsGrounded() == false)
+        {
+            // ブロックの種類を保存
+            int letter_id = blocks[fallingBlocks[1].x, fallingBlocks[1].y].GetComponent<BlockScript>().GetAlphabet();
+            // 現在の座標を空に
+            blocks[fallingBlocks[1].x, fallingBlocks[1].y].GetComponent<BlockScript>().SetEmpty();
+            // 座標を更新
+            fallingBlocks[1].x=fallingBlocks[0].x+deltaX;
+            fallingBlocks[1].y = fallingBlocks[0].y + deltaY;
+            // 更新した座標に表示
+            blocks[fallingBlocks[1].x, fallingBlocks[1].y].GetComponent<BlockScript>().SetAlphabet(letter_id, false);
+        }
     }
 }
