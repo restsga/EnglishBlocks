@@ -2,6 +2,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+class States
+{
+    public int now = ERROR;
+    public float timer = 0f;
+
+    public const int
+        ERROR = 0,
+        FALLING = 1,
+        FALL_ANIMATION = 2,
+        CLEAN_ANIMATION = 3;
+
+    public float fallInterval = 1f;
+    public float fallAnimationInterval= 0.5f;
+}
+
 class FallingBlock
 {
     public int x;
@@ -14,6 +29,9 @@ public class GameManager : MonoBehaviour
     // Constants //
     private readonly int[] BLOCK_COUNTS = { 8, 12 };
     private const float BLOCK_SIZE = 0.13f;
+
+    // 実験用
+    private const float GAMESPEED = 1f;
     
 
     // Prefabs //
@@ -25,9 +43,8 @@ public class GameManager : MonoBehaviour
     private GameObject[,] blocks;
     // 落下中のブロックの座標
     private FallingBlock[] fallingBlocks = { new FallingBlock(), new FallingBlock() };
-
-    // プロトタイプ用の仮のタイマー
-    private float timer = 0f;
+    // 現在の状態(アニメーションなど)
+    private States states = new States();
 
     // Use this for initialization
     void Start()
@@ -44,11 +61,29 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        timer += Time.deltaTime;
-        if (timer >= 1f)
+        states.timer += Time.deltaTime*GAMESPEED;
+
+        switch (states.now)
         {
-            timer -= 1f;
-            FallBlock();
+            case States.FALLING:
+                if (states.timer >= states.fallInterval)
+                {
+                    states.timer = 0f;
+                    FallControledBlock();
+                }
+                break;
+
+            case States.FALL_ANIMATION:
+                if (states.timer >= states.fallAnimationInterval)
+                {
+                    states.timer = 0f;
+                    FreeFallAnimation();
+                }
+                break;
+
+            case States.CLEAN_ANIMATION:
+                CreateBlock();
+                break;
         }
     }
 
@@ -91,7 +126,7 @@ public class GameManager : MonoBehaviour
     private void CreateBlock()
     {
         // 落下してくるブロックが生成される場所
-        int[] createPos = { BLOCK_COUNTS[0] / 2, BLOCK_COUNTS[1] };
+        int[] createPos = { blocks.GetLength(0) / 2-1, blocks.GetLength(1)-2 };
 
         // 生成される場所が埋まっていない(ゲームオーバーではない)
         if (blocks[createPos[0], createPos[1]].GetComponent<BlockScript>().IsGrounded() == false)
@@ -111,27 +146,80 @@ public class GameManager : MonoBehaviour
                 GetComponent<BlockScript>().SetAlphabet(fallingBlocks[0].letter_id,false);
             blocks[fallingBlocks[1].x, fallingBlocks[1].y].
                 GetComponent<BlockScript>().SetAlphabet(fallingBlocks[1].letter_id,false);
+
+            //落下状態に移行
+            states.now = States.FALLING;
         }
     }
 
     // ブロックを落下させる
-    private void FallBlock()
+    private void FallControledBlock()
     {
         // 2つのブロックのどちらも接地条件を満たしていない
         if (blocks[fallingBlocks[0].x,fallingBlocks[0].y-1].GetComponent<BlockScript>().IsGrounded() == false&&
             blocks[fallingBlocks[1].x, fallingBlocks[1].y - 1].GetComponent<BlockScript>().IsGrounded() == false)
         {
-            // 現在ブロックがある座標からブロックを削除
-            blocks[fallingBlocks[0].x, fallingBlocks[0].y].GetComponent<BlockScript>().SetEmpty();
-            blocks[fallingBlocks[1].x, fallingBlocks[1].y].GetComponent<BlockScript>().SetEmpty();
-            // ブロックを移動(落下)
-            fallingBlocks[0].y--;
-            fallingBlocks[1].y--;
-            // 新たな座標で表示
-            blocks[fallingBlocks[0].x, fallingBlocks[0].y].
-                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[0].letter_id,false);
-            blocks[fallingBlocks[1].x, fallingBlocks[1].y].
-                GetComponent<BlockScript>().SetAlphabet(fallingBlocks[1].letter_id, false);
+            for (int i = 0; i < 2; i++)
+            {
+                // 落下
+                Fall(fallingBlocks[i].x, fallingBlocks[i].y);
+                // 座標を更新
+                fallingBlocks[i].y--;
+            }
         }
+        // 接地条件を満たした
+        else
+        {
+            states.now = States.FALL_ANIMATION;
+        }
+    }
+
+    // 自由落下アニメーション
+    private void FreeFallAnimation()
+    {
+        //落下フラグ
+        bool fall=false;
+
+        for(int x = 1; x < blocks.GetLength(0) - 1; x++)
+        {
+            for(int y = 1; y < blocks.GetLength(1) - 1; y++)
+            {
+                // 空のブロックでない
+                if (blocks[x, y].GetComponent<BlockScript>().IsFill())
+                {
+                    // 下にあるブロックが接地されている
+                    if(blocks[x, y - 1].GetComponent<BlockScript>().IsGrounded())
+                    {
+                        // 接地する
+                        blocks[x, y].GetComponent<BlockScript>().SetGrounded();
+                    }
+                    // 下にあるブロックが接地されていない
+                    else
+                    {
+                        // 落下
+                        Fall(x, y);
+
+                        fall = true;
+                    }
+                }
+            }
+        }
+
+        // 落下したブロックが存在しない
+        if (fall == false)
+        {
+            states.now = States.CLEAN_ANIMATION;
+        }
+    }
+
+    // ブロックを1マス下に移動
+    private void Fall(int x,int y)
+    {
+        // ブロックの種類を保存
+        int letter_id = blocks[x, y].GetComponent<BlockScript>().GetAlphabet();
+        // 現在の座標を空に
+        blocks[x, y].GetComponent<BlockScript>().SetEmpty();
+        // ひとつ下の座標を更新
+        blocks[x, y - 1].GetComponent<BlockScript>().SetAlphabet(letter_id, false);
     }
 }

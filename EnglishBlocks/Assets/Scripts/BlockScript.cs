@@ -10,12 +10,12 @@ public class BlockScript : MonoBehaviour {
         "a","b","c","d","e","f","g","h","i","j","k","l","m",
         "n","o","p","q","r","s","t","u","v","w","x","y","z"
     };
-    private const string EMPTY = ",";
+    private const int EMPTY = -1;
     private bool UPDATE = true;
   
     // Datas //
     private bool grounded = false;
-    private string letter = EMPTY;
+    private int letter_id = EMPTY;
 
     // Use this for initialization
     void Start () {
@@ -34,7 +34,7 @@ public class BlockScript : MonoBehaviour {
 
     public void SetAlphabet(int alphabet_id, bool grounded)
     {
-        letter = ALPHABETS[alphabet_id];
+        letter_id = alphabet_id;
         this.grounded = grounded;
 
         if (UPDATE)
@@ -43,10 +43,30 @@ public class BlockScript : MonoBehaviour {
         }
     }
 
+    public int GetAlphabet()
+    {
+        return letter_id;
+    }
+
     public void SetEmpty()
     {
-        letter = EMPTY;
+        letter_id = EMPTY;
+        grounded = false;
         GetComponent<SpriteRenderer>().sprite = null;
+    }
+
+    public bool IsFill()
+    {
+        if (letter_id != EMPTY)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    public void SetGrounded()
+    {
+        grounded = true;
     }
 
     public bool IsGrounded()
